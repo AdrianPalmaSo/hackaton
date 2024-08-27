@@ -1,0 +1,41 @@
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up Azure CLI
+      - name: Set up Azure CLI
+        uses: azure/setup-azure-cli@v1
+        with:
+          azure-clid: ${{ secrets.AZURE_CLI_CREDENTIALS }}
+
+      # Log in to Azure
+      - name: Log in to Azure
+        run: |
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+      # Build and Push Docker Image
+      - name: Build and Push Docker Image
+        run: |
+          az acr build --registry ${{ secrets.AZURE_ACR_NAME }} --image ${{ secrets.AZURE_ACR_NAME }}.azurecr.io/${{ secrets.AZURE_CONTAINER_APP }}:${{ github.sha }} .
+
+      # Deploy to Azure Container Apps
+      - name: Deploy to Azure Container Apps
+        run: |
+          az containerapp update --name ${{ secrets.AZURE_CONTAINER_APP }} --resource-group ${{ secrets.AZURE_RG }} --image ${{ secrets.AZURE_ACR_NAME }}.azurecr.io/${{ secrets.AZURE_CONTAINER_APP }}:${{ github.sha }}
+
+      # Optionally, change targetPort to 3000 if needed
+      - name: Update targetPort to 3000
+        run: |
+          az containerapp update --name ${{ secrets.AZURE_CONTAINER_APP }} --resource-group ${{ secrets.AZURE_RG }} --set properties.configuration.ingress.targetPort=3000
